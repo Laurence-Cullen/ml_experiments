@@ -2,18 +2,24 @@ from __future__ import division
 from keras.models import Sequential
 from keras import optimizers
 from keras.layers import Dense
+from keras import regularizers
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
 # setting constant seed
 from numpy.random import seed
-seed(1)
+# seed(1)
 from tensorflow import set_random_seed
-set_random_seed(2)
+# set_random_seed(2)
 
 
 def clean_ticket_numbers(ticket_strings):
+    """
+    Strips out any non numeric prefixes to ticket number strings
+    :param ticket_strings:
+    :return:
+    """
     ticket_numbers = np.zeros(shape=np.shape(ticket_strings), dtype=int)
 
     for i in range(0, len(ticket_strings)):
@@ -29,8 +35,55 @@ def clean_ticket_numbers(ticket_strings):
     return ticket_numbers
 
 
+def string_list_contains_substring(string_list, substring):
+    """
+    Takes a list of strings and returns a binary array with the same length, the binary string has a value of 1 if
+    the respective string in the list of strings contains substring, otherwise it has a value of 0.
+    """
+    binary_array = np.zeros(shape=(len(string_list)))
+
+    # print('searching for strings containing the substring %s' % substring)
+    # print('string list has %i elements' % len(string_list))
+
+    for string_index in range(0, len(string_list)):
+        print(string_index)
+
+        try:
+            binary_array[string_index] = substring in string_list[string_index]
+        except TypeError:
+            binary_array[string_index] = 0
+
+    return binary_array
+
+
+def element_wise_string_length_counter(string_list):
+    """
+    Takes a list of strings as an argument and returns an array of the same length where the elements of the returned
+    array correspond to the length of the string at that index in the list of strings.
+    """
+    length_array = np.zeros(shape=(len(string_list)))
+
+    for string_index in range(0, len(string_list)):
+        length_array[string_index] = len(string_list[string_index])
+
+    return length_array
+
+
+def element_wise_word_counter(string_list):
+    """
+    Takes a list of strings as an argument and returns an array with the same number of elements where the value of
+    each array element corresponds to the number of words in its respective string.
+    """
+
+    number_of_words_array = np.zeros(shape=(len(string_list)))
+
+    for string_index in range(0, len(string_list)):
+        number_of_words_array[string_index] = len(string_list[string_index].split(' '))
+    return number_of_words_array
+
+
 def construct_features(passenger_data):
-    number_of_features = 9
+    number_of_features = 22
     examples = len(passenger_data['Age'].values)
 
     # creating features array
@@ -69,7 +122,6 @@ def construct_features(passenger_data):
     # adding scaled passenger class
     features[:, 2] = passenger_data['Pclass'].values / 3
 
-
     # adding scaled number of siblings and spouses
     features[:, 4] = passenger_data['SibSp'].values / np.max(passenger_data['SibSp'].values)
 
@@ -87,12 +139,53 @@ def construct_features(passenger_data):
     normalized_ticket_numbers = ticket_numbers / np.nanmax(ticket_numbers)
     features[:, 8] = normalized_ticket_numbers
 
-    # surname is Miss
+    # title is Miss
+    features[:, 9] = string_list_contains_substring(passenger_data['Name'].values, 'Miss')
 
-    # surname is Mr
+    # title is Mr
+    features[:, 10] = string_list_contains_substring(passenger_data['Name'].values, 'Mr')
 
-    # surname is Mrs
+    # title is Mrs
+    features[:, 11] = string_list_contains_substring(passenger_data['Name'].values, 'Mrs')
 
+    # title is Master
+    features[:, 12] = string_list_contains_substring(passenger_data['Name'].values, 'Master')
+
+    # embarked at C
+    features[:, 13] = string_list_contains_substring(passenger_data['Embarked'].values, 'C')
+
+    # embarked at S
+    features[:, 14] = string_list_contains_substring(passenger_data['Embarked'].values, 'S')
+
+    # embarked at Q
+    features[:, 15] = string_list_contains_substring(passenger_data['Embarked'].values, 'Q')
+
+    # has a cabin at level A
+    features[:, 16] = string_list_contains_substring(passenger_data['Cabin'].values, 'A')
+
+    # has a cabin at level B
+    features[:, 17] = string_list_contains_substring(passenger_data['Cabin'].values, 'B')
+
+    # has a cabin at level C
+    features[:, 18] = string_list_contains_substring(passenger_data['Cabin'].values, 'C')
+
+    # has a cabin at level D
+    features[:, 19] = string_list_contains_substring(passenger_data['Cabin'].values, 'D')
+
+    # has a cabin at level E
+    features[:, 20] = string_list_contains_substring(passenger_data['Cabin'].values, 'E')
+
+    # has a cabin at level F
+    features[:, 21] = string_list_contains_substring(passenger_data['Cabin'].values, 'F')
+
+
+    # # counting the number of characters in each name string
+    # name_string_lengths = element_wise_string_length_counter(passenger_data['Name'].values)
+    # features[:, 16] = name_string_lengths / np.nanmax(name_string_lengths)
+    #
+    # # counting the number of words in each name string
+    # words_per_name_string = element_wise_word_counter(passenger_data['Name'].values)
+    # features[:, 17] = words_per_name_string / np.nanmax(words_per_name_string)
 
     return features
 
@@ -101,7 +194,7 @@ def main():
     all_data = pd.read_csv('./data/train.csv')
 
     rows = len(all_data.index)
-    divider_row = int(rows * 0.99)
+    divider_row = int(rows * 0.90)
     train_data = all_data[:divider_row]
     test_data = all_data[divider_row:rows]
 
@@ -120,13 +213,17 @@ def main():
 
     _, number_of_features = np.shape(train_features)
 
+    reg_value = 0.005
+
     # building nn topology
     # TODO experiment with adding regularization
     model = Sequential()
-    model.add(Dense(units=20, activation='relu', input_dim=number_of_features))
-    model.add(Dense(units=10, activation='relu'))
-    model.add(Dense(units=10, activation='relu'))
-    model.add(Dense(units=10, activation='relu'))
+    model.add(Dense(units=20, activation='relu', input_dim=number_of_features, kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=20, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=20, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=20, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=10, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=5, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
     model.add(Dense(units=1, activation='relu'))
 
     optimizer = optimizers.sgd(lr=0.01)
@@ -178,6 +275,7 @@ def main():
     submission_output['Survived'] = survived.astype(dtype=int)
     submission_output.to_csv('./submission.csv', index=False)
 
+    print('submissions saved to ./submissions.csv')
 
 if __name__ == '__main__':
     main()
