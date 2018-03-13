@@ -216,7 +216,6 @@ def main():
     reg_value = 0.005
 
     # building nn topology
-    # TODO experiment with adding regularization
     model = Sequential()
     model.add(Dense(units=20, activation='relu', input_dim=number_of_features, kernel_regularizer=regularizers.l2(reg_value)))
     model.add(Dense(units=20, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
