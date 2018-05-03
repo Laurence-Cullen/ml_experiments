@@ -160,7 +160,7 @@ def main():
                   optimizer=optimizer,
                   metrics=['accuracy'])
 
-    epochs = 2000
+    epochs = 20000
 
     history = model.fit(x=train_features.values,
                         y=train_survived_labels,
