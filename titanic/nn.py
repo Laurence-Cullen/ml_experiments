@@ -42,14 +42,15 @@ def construct_features(passenger_data):
         elif sex == 'female':
             return 0
         elif math.isnan(sex):
-            return 0.5
+            return float('NaN')
         else:
             raise ValueError('error mapping sex binary values')
 
     features['is_male'] = passenger_data['Sex'].map(sex_to_binary)
+    features['is_male'] = features['is_male'].fillna(features['is_male'].mean())
 
     # adding scaled passenger fare
-    features['fare'] = passenger_data['Fare'] / passenger_data['Fare'].max()
+    # features['fare'] = passenger_data['Fare'] / passenger_data['Fare'].max()
 
     # adding scaled passenger class
     features['p_class'] = passenger_data['Pclass'] / 3
@@ -61,15 +62,15 @@ def construct_features(passenger_data):
     features['par_child'] = passenger_data['Parch'] / passenger_data['Parch'].max()
 
     # adding a binary value for whether each passenger had a cabin or not
-    features['has_cabin'] = pd.notnull(passenger_data['Cabin']).values.astype(float)
+    # features['has_cabin'] = pd.notnull(passenger_data['Cabin']).values.astype(float)
 
     # building a derived feature of the number of total family members on board
     features['kin_on_board'] = (features['sib_spouse'] + features['par_child']) / 2
 
     # normalized ticket number
-    ticket_numbers = clean_ticket_numbers(passenger_data['Ticket'].values)
-    normalized_ticket_numbers = ticket_numbers / np.nanmax(ticket_numbers)
-    features['ticket_num'] = normalized_ticket_numbers
+    # ticket_numbers = clean_ticket_numbers(passenger_data['Ticket'].values)
+    # normalized_ticket_numbers = ticket_numbers / np.nanmax(ticket_numbers)
+    # features['ticket_num'] = normalized_ticket_numbers
 
     # title is Miss
     features['miss'] = passenger_data['Name'].str.contains('Miss').values.astype(float)
@@ -112,7 +113,7 @@ def construct_features(passenger_data):
             return 0
         else:
             return 0
-
+    #
     features['level'] = passenger_data['Cabin'].map(cabin_to_float)
 
     features.astype(float)
@@ -122,15 +123,21 @@ def construct_features(passenger_data):
 def main():
     all_data = pd.read_csv('./data/train.csv')
 
-    rows = len(all_data.index)
-    divider_row = int(rows * 0.80)
-    train_data = all_data[:divider_row]
-    test_data = all_data[divider_row:rows]
+    train_data = all_data.sample(frac=0.8, replace=False)
+    test_data = all_data.loc[~all_data.index.isin(train_data.index)]
+
+    print('shape of train_data = ' + str(train_data.shape))
+    print('shape of test_data = ' + str(test_data.shape))
+
+    # rows = len(all_data.index)
+    # divider_row = int(rows * 0.90)
+    # train_data = all_data[:divider_row]
+    # test_data = all_data[divider_row:rows]
 
     train_features = construct_features(train_data)
     train_features.to_csv(path_or_buf='full_features.csv')
 
-    print(train_features.values)
+    # print(train_features.values)
 
     train_survived_labels = train_data['Survived'].values
     
@@ -139,7 +146,7 @@ def main():
 
     _, number_of_features = np.shape(train_features)
 
-    reg_value = 0.000
+    reg_value = 0.001
 
     # building nn topology
     model = Sequential()
@@ -150,8 +157,8 @@ def main():
 
     model.add(Dense(units=10, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
     model.add(Dense(units=5, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
-    # model.add(Dense(units=5, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
-    # model.add(Dense(units=5, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=5, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
+    model.add(Dense(units=5, activation='relu', kernel_regularizer=regularizers.l2(reg_value)))
     model.add(Dense(units=1, activation='sigmoid'))
 
     optimizer = optimizers.sgd(lr=0.001)
@@ -160,13 +167,16 @@ def main():
                   optimizer=optimizer,
                   metrics=['accuracy'])
 
-    epochs = 20000
+    epochs = 10000
 
     history = model.fit(x=train_features.values,
                         y=train_survived_labels,
                         validation_data=(test_features, test_survived_labels),
+                        validation_split=0.5,
                         epochs=epochs,
                         batch_size=64)
+
+    print('history keys = ' + str(history.history.keys()))
 
     plt.plot(history.history['acc'], label='train accuracy')
     plt.plot(history.history['val_acc'], label='test accuracy')
